@@ -1,4 +1,4 @@
-name: Build (Linux, CMake + Make, Clang)
+name: build-linux-nightly
 
 on:
   workflow_dispatch:
@@ -7,28 +7,36 @@ permissions:
   contents: write
 
 jobs:
-  build-linux:
-    runs-on: ubuntu-latest
+  build:
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Install deps (Clang, CMake, Make, ccache)
+      - name: Install deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang lld libglu1-mesa-dev cmake make ccache zip pkg-config libpng-dev zlib1g-dev libgl1-mesa-dev libopengl-dev libglx-dev mesa-common-dev libglfw3-dev libxrandr-dev libxi-dev libxxf86vm-dev libxinerama-dev libxcursor-dev
+          sudo apt-get install -y \
+            clang cmake make ccache pkg-config \
+            libpng-dev \
+            libgl1-mesa-dev libglu1-mesa-dev \
+            libglfw3-dev \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
 
-      - name: Cache ccache
+      - name: Setup ccache
         uses: actions/cache@v4
         with:
-          path: ~/.cache/ccache
-          key: ccache-${{ runner.os }}-${{ github.ref_name }}-${{ github.sha }}
+          path: |
+            ~/.cache/ccache
+          key: ccache-${{ runner.os }}-clang-${{ github.ref }}-${{ github.sha }}
           restore-keys: |
-            ccache-${{ runner.os }}-${{ github.ref_name }}-
-            ccache-${{ runner.os }}-
+            ccache-${{ runner.os }}-clang-${{ github.ref }}-
+            ccache-${{ runner.os }}-clang-
 
-      - name: Configure (Release, Clang, Unix Makefiles)
+      - name: Configure (Release, clang, Makefiles, optimized, quiet)
         run: |
           cmake -S . -B build -G "Unix Makefiles" \
             -DCMAKE_BUILD_TYPE=Release \
@@ -36,39 +44,45 @@ jobs:
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_UNITY_BUILD=ON \
-            -DCMAKE_UNITY_BUILD_BATCH_SIZE=16
+            -DCMAKE_C_FLAGS="-O3 -DNDEBUG -w" \
+            -DCMAKE_CXX_FLAGS="-O3 -DNDEBUG -w -flto=thin" \
+            -DCMAKE_EXE_LINKER_FLAGS="-flto=thin" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-flto=thin"
 
       - name: Build (parallel)
         run: |
           cmake --build build -- -j"$(nproc)"
 
-      - name: Package
+      - name: Package build outputs
         run: |
+          set -euxo pipefail
           mkdir -p dist
-          cp -r build/* dist/ || true
-          zip -r build-linux.zip dist
+
+          # Grab likely outputs (executables + shared libs + static libs)
+          find build -type f \( -perm -111 -o -name "*.so" -o -name "*.a" \) -print0 \
+            | tar --null -T - -czf dist/4jcraft-linux-x86_64.tar.gz
+
+          echo "Packaged:"
+          ls -lah dist
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: build-linux
-          path: build-linux.zip
+          name: 4jcraft-linux
+          path: dist/4jcraft-linux-x86_64.tar.gz
 
-      # "nightly.link" works great with either artifacts or releases.
-      # This publishes a constant "nightly" GitHub Release containing the zip,
-      # which nightly.link can mirror as a stable download.
-      - name: Publish/Update GitHub Release "nightly"
-        uses: softprops/action-gh-release@v2
+      - name: Create/Update nightly release (tag: nightly)
+        uses: ncipollo/release-action@v1
         with:
-          tag_name: nightly
+          tag: nightly
           name: Nightly
           prerelease: true
-          files: build-linux.zip
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+          allowUpdates: true
+          replacesArtifacts: true
+          artifacts: dist/4jcraft-linux-x86_64.tar.gz
+          token: ${{ github.token }}
 
-      - name: Print nightly.link URLs (Artifact + Release)
+      - name: Print nightly.link URL (for the artifact)
         run: |
-          echo "Artifact (nightly.link): https://nightly.link/${{ github.repository }}/actions/runs/${{ github.run_id }}/build-linux.zip"
-          echo "Release  (nightly.link): https://nightly.link/${{ github.repository }}/releases/download/nightly/build-linux.zip"
+          echo "Nightly.link (artifact) URL format:"
+          echo "https://nightly.link/${{ github.repository }}/actions/runs/${{ github.run_id }}/4jcraft-linux.zip"
