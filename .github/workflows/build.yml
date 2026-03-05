@@ -1,0 +1,74 @@
+name: Build (Linux, CMake + Make, Clang)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install deps (Clang, CMake, Make, ccache)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake make ccache zip
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-${{ runner.os }}-${{ github.ref_name }}-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ github.ref_name }}-
+            ccache-${{ runner.os }}-
+
+      - name: Configure (Release, Clang, Unix Makefiles)
+        run: |
+          cmake -S . -B build -G "Unix Makefiles" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_UNITY_BUILD=ON \
+            -DCMAKE_UNITY_BUILD_BATCH_SIZE=16
+
+      - name: Build (parallel)
+        run: |
+          cmake --build build -- -j"$(nproc)"
+
+      - name: Package
+        run: |
+          mkdir -p dist
+          cp -r build/* dist/ || true
+          zip -r build-linux.zip dist
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-linux
+          path: build-linux.zip
+
+      # "nightly.link" works great with either artifacts or releases.
+      # This publishes a constant "nightly" GitHub Release containing the zip,
+      # which nightly.link can mirror as a stable download.
+      - name: Publish/Update GitHub Release "nightly"
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly
+          name: Nightly
+          prerelease: true
+          files: build-linux.zip
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Print nightly.link URLs (Artifact + Release)
+        run: |
+          echo "Artifact (nightly.link): https://nightly.link/${{ github.repository }}/actions/runs/${{ github.run_id }}/build-linux.zip"
+          echo "Release  (nightly.link): https://nightly.link/${{ github.repository }}/releases/download/nightly/build-linux.zip"
