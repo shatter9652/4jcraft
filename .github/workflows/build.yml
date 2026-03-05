@@ -17,7 +17,7 @@ jobs:
       - name: Install deps (Clang, CMake, Make, ccache)
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang lld cmake make ccache zip pkg-config libpng-dev zlib1g-dev libgl1-mesa-dev libopengl-dev libglx-dev mesa-common-dev libglfw3-dev libxrandr-dev libxi-dev libxxf86vm-dev libxinerama-dev libxcursor-dev
+          sudo apt-get install -y clang lld libglu1-mesa-dev cmake make ccache zip pkg-config libpng-dev zlib1g-dev libgl1-mesa-dev libopengl-dev libglx-dev mesa-common-dev libglfw3-dev libxrandr-dev libxi-dev libxxf86vm-dev libxinerama-dev libxcursor-dev
 
       - name: Cache ccache
         uses: actions/cache@v4
