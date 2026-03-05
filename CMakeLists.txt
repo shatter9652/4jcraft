@@ -2,6 +2,34 @@ cmake_minimum_required(VERSION 3.16.0 FATAL_ERROR)
 
 project(MinecraftConsoles C CXX)
 
+# ----------------------------------------------------------------
+# Linux / Clang build improvements
+# ----------------------------------------------------------------
+if(NOT MSVC)
+
+    # fast optimized builds
+    set(CMAKE_BUILD_TYPE Release)
+
+    add_compile_options(
+        -O3
+        -march=native
+        -pipe
+        -fvisibility=hidden
+        -fno-exceptions
+        -fno-rtti
+        -w                 # suppress warnings + notes
+    )
+
+    add_link_options(
+        -fuse-ld=lld
+    )
+
+endif()
+
+# speed up builds massively
+set(CMAKE_UNITY_BUILD ON)
+set(CMAKE_UNITY_BUILD_BATCH_SIZE 32)
+
 ################################################################################
 # Set target arch type if empty. Visual studio solution generator provides it.
 ################################################################################
