@@ -12,11 +12,10 @@ if(NOT MSVC)
 
     add_compile_options(
         -O3
-        -march=native
         -pipe
         -fvisibility=hidden
         -fno-exceptions
-        -fno-rtti
+        -frtti
         -w                 # suppress warnings + notes
     )
 
@@ -29,8 +28,6 @@ endif()
 # speed up builds massively
 set(CMAKE_UNITY_BUILD ON)
 set(CMAKE_UNITY_BUILD_BATCH_SIZE 32)
-
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -frtti -w")
 
 ################################################################################
 # Set target arch type if empty. Visual studio solution generator provides it.
