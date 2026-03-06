@@ -37,7 +37,11 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_UNITY_BUILD=ON \
-            -DCMAKE_UNITY_BUILD_BATCH_SIZE=16
+            -DCMAKE_UNITY_BUILD_BATCH_SIZE=32 \
+            -DCMAKE_C_FLAGS="-O3 -DNDEBUG -w -pipe" \
+            -DCMAKE_CXX_FLAGS="-O3 -DNDEBUG -w -pipe -flto=thin -frtti" \
+            -DCMAKE_EXE_LINKER_FLAGS="-flto=thin -fuse-ld=lld" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-flto=thin -fuse-ld=lld"
 
       - name: Build (parallel)
         run: |
